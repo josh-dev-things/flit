@@ -11,6 +11,8 @@
 
 /*** defines ***/
 
+#define VERSION "0.0.1"
+
 #define CTRL_KEY(k) ((k) & 0x1f) // Set upper 3 bits of char to 0. Sameas CTRL key
 
 /*** data ***/
@@ -131,11 +133,28 @@ void abFree(struct abuf* ab) {
 
 /*** output ***/
 
-void editorDrawRows(struct abuf *ab) {
+void editorDrawRows(struct abuf *ab) { //TODO: MOVE THE CURSOR
     int y;
     for (y = 0; y < E.screenrows; y++) {
-        abAppend(ab, "~", 1);
+        if (y == E.screenrows / 3) {
+            char welcome[80];
+            int welcomelen = snprintf(welcome, sizeof(welcome), "Flit editor -- version %s", VERSION);
+            if (welcomelen > E.screencols) welcomelen = E.screencols;
 
+            // Padding
+            int padding = (E.screencols - welcomelen) / 2;
+            if (padding) {
+                abAppend(ab, "~", 1);
+                padding--;
+            }
+            while (padding--) abAppend(ab, " ", 1);
+
+            abAppend(ab, welcome, welcomelen);
+        } else {
+            abAppend(ab, "~", 1);
+        }
+
+        abAppend(ab, "\x1b[K", 3); // Clearing screen by "Erasing in line"
         if (y < E.screenrows - 1) {
             abAppend(ab, "\r\n", 2);
         }
@@ -145,17 +164,17 @@ void editorDrawRows(struct abuf *ab) {
 void editorRefreshScreen() {
     struct abuf ab = ABUF_INIT;
 
-    abAppend(&ab, "\x1b[2J", 4); // Escape character + clear screen command
+    abAppend(&ab, "\x1b[?25l", 6);
     abAppend(&ab, "\x1b[H", 3); // Position the cursor : (3 bytes)
 
     editorDrawRows(&ab);
 
     abAppend(&ab, "\x1b[H", 3);
+    abAppend(&ab, "\x1b[?25h", 6);
 
     write(STDOUT_FILENO, ab.b, ab.len);
     abFree(&ab);
 
-    //TODO: HIDE THE CURSOR WHEN REPAINTING
 }
 
 /*** input ***/
