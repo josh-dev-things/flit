@@ -15,9 +15,17 @@
 
 #define CTRL_KEY(k) ((k) & 0x1f) // Set upper 3 bits of char to 0. Sameas CTRL key
 
+enum editorKey {
+    LEFT = 1000,
+    RIGHT,
+    UP,
+    DOWN
+};
+
 /*** data ***/
 
 struct editorConfig {
+    int cx, cy;
     int screenrows;
     int screencols;
 
@@ -66,7 +74,7 @@ void enableRawMode() {
 
 /// @brief Wait for one keypress & return it
 /// @return Pressed key
-char editorReadKey() {
+int editorReadKey() {
     int nread;
     char c;
 
@@ -74,7 +82,23 @@ char editorReadKey() {
         if (nread == -1 && errno != EAGAIN) fail("read");
     }
 
-    return c;
+    if (c == '\x1b') {
+        char seq[3];
+        if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
+        if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
+        if (seq[0] == '[') {
+        switch (seq[1]) {
+            case 'A': return UP;
+            case 'B': return DOWN;
+            case 'C': return RIGHT;
+            case 'D': return LEFT;
+        }
+    }
+
+    return '\x1b';
+    } else {
+        return c;
+    }
 }
 
 int getCursorPosition(int* rows, int* cols) {
@@ -169,7 +193,10 @@ void editorRefreshScreen() {
 
     editorDrawRows(&ab);
 
-    abAppend(&ab, "\x1b[H", 3);
+    char buf[32];
+    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);
+    abAppend(&ab, buf, strlen(buf));
+
     abAppend(&ab, "\x1b[?25h", 6);
 
     write(STDOUT_FILENO, ab.b, ab.len);
@@ -179,9 +206,26 @@ void editorRefreshScreen() {
 
 /*** input ***/
 
+void editorMoveCursor(int key) {
+    switch (key) {
+        case LEFT:
+            E.cx--;
+            break;
+        case RIGHT:
+            E.cx++;
+            break;
+        case UP:
+            E.cy--;
+            break;
+        case DOWN:
+            E.cy++;
+            break;
+    }
+}
+
 /// @brief Awaits keypress, then handles it.
 void editorHandleKeyPress() {
-    char c = editorReadKey();
+    int c = editorReadKey();
 
     switch (c) {
         case CTRL_KEY('q'):
@@ -190,12 +234,22 @@ void editorHandleKeyPress() {
 
             exit(0);
             break;
+
+        case UP:
+        case DOWN:
+        case LEFT:
+        case RIGHT:
+            editorMoveCursor(c);
+            break;
     }
 }
 
 /*** init ***/
 
 void initEditor() {
+    E.cx = 0;
+    E.cy = 0;
+
     if (getWindowSize(&E.screenrows, &E.screencols) == -1) fail("getWindowSize");
 }
 
