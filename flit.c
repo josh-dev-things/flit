@@ -19,7 +19,10 @@ enum editorKey {
     LEFT = 1000,
     RIGHT,
     UP,
-    DOWN
+    DOWN,
+    DEL,
+    P_UP,
+    P_DOWN
 };
 
 /*** data ***/
@@ -86,14 +89,27 @@ int editorReadKey() {
         char seq[3];
         if (read(STDIN_FILENO, &seq[0], 1) != 1) return '\x1b';
         if (read(STDIN_FILENO, &seq[1], 1) != 1) return '\x1b';
+
         if (seq[0] == '[') {
-        switch (seq[1]) {
-            case 'A': return UP;
-            case 'B': return DOWN;
-            case 'C': return RIGHT;
-            case 'D': return LEFT;
+            if (seq[1] >= '0' && seq[1] <= '9') {
+                if (read(STDIN_FILENO, &seq[2], 1) != 1) return '\x1b';
+                if (seq[2] == '~') {
+                    switch (seq[1]) {
+                        case '3': return DEL;
+                        case '5': return P_UP;
+                        case '6': return P_DOWN;
+                    }
+                }
+            } else {
+                switch (seq[1]) {
+                    case 'A': return UP;
+                    case 'B': return DOWN;
+                    case 'C': return RIGHT;
+                    case 'D': return LEFT;
+                }
+            }
         }
-    }
+    
 
     return '\x1b';
     } else {
@@ -157,7 +173,7 @@ void abFree(struct abuf* ab) {
 
 /*** output ***/
 
-void editorDrawRows(struct abuf *ab) { //TODO: MOVE THE CURSOR
+void editorDrawRows(struct abuf *ab) {
     int y;
     for (y = 0; y < E.screenrows; y++) {
         if (y == E.screenrows / 3) {
@@ -209,16 +225,16 @@ void editorRefreshScreen() {
 void editorMoveCursor(int key) {
     switch (key) {
         case LEFT:
-            E.cx--;
+            if (E.cx != 0) E.cx--;
             break;
         case RIGHT:
-            E.cx++;
+            if (E.cx != E.screencols - 1) E.cx++;
             break;
         case UP:
-            E.cy--;
+            if (E.cy != 0) E.cy--;
             break;
         case DOWN:
-            E.cy++;
+            if (E.cy != E.screenrows - 1) E.cy++;
             break;
     }
 }
@@ -234,6 +250,14 @@ void editorHandleKeyPress() {
 
             exit(0);
             break;
+
+        case P_UP:
+        case P_DOWN:
+            {
+                int times = E.screenrows;
+                while (times--)
+                    editorMoveCursor(c == P_UP ? UP : DOWN);
+            }
 
         case UP:
         case DOWN:
