@@ -293,7 +293,7 @@ void editorRefreshScreen() {
 
 /*** input ***/
 
-void editorMoveCursor(int key) {
+void editorMoveCursor(int key) {    // TODO : RENDERING TABS
     erow* row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
 
     switch (key) {
