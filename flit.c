@@ -298,11 +298,19 @@ void editorMoveCursor(int key) {
 
     switch (key) {
         case LEFT:
-            if (E.cx != 0) E.cx--;
+            if (E.cx != 0) {
+                E.cx--;
+            } else if (E.cy > 0) {
+                E.cy--;
+                E.cx = E.row[E.cy].size;
+            }
             break;
         case RIGHT:
             if (row && E.cx < row->size) {
                 E.cx++;
+            } else if (row && E.cx == row->size) {
+                E.cy++;
+                E.cx = 0;
             }
             break;
         case UP:
