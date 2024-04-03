@@ -270,7 +270,7 @@ void editorDrawRows(struct abuf *ab) {
     }
 }
 
-void editorRefreshScreen() { // TODO : LIMIT SCROLLING TO THE RIGHT
+void editorRefreshScreen() {
     editorScroll();
 
     struct abuf ab = ABUF_INIT;
@@ -294,12 +294,16 @@ void editorRefreshScreen() { // TODO : LIMIT SCROLLING TO THE RIGHT
 /*** input ***/
 
 void editorMoveCursor(int key) {
+    erow* row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
+
     switch (key) {
         case LEFT:
             if (E.cx != 0) E.cx--;
             break;
         case RIGHT:
-            E.cx++;
+            if (row && E.cx < row->size) {
+                E.cx++;
+            }
             break;
         case UP:
             if (E.cy != 0) E.cy--;
