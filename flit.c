@@ -312,6 +312,12 @@ void editorMoveCursor(int key) {
             if (E.cy < E.numrows) E.cy++;
             break;
     }
+
+    row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
+    int rowlen = row ? row->size : 0;
+    if (E.cx > rowlen) {
+        E.cx = rowlen;
+    }
 }
 
 /// @brief Awaits keypress, then handles it.
