@@ -369,7 +369,7 @@ void editorRefreshScreen() {
 
 /*** input ***/
 
-void editorMoveCursor(int key) {    // TODO : Tabs and the cursor
+void editorMoveCursor(int key) { 
     erow* row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
 
     switch (key) {
