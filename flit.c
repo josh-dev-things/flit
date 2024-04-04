@@ -332,7 +332,6 @@ void editorDrawStatusBar(struct abuf *ab) { // TODO : STATUS MESSAGE
     if (len > E.screencols) len = E.screencols;
     abAppend(ab, status, len);
     
-    int len = 0;
     while (len < E.screencols) {
         if (E.screencols - len == rlen) {
             abAppend(ab, rstatus, rlen);
