@@ -361,7 +361,7 @@ void editorRefreshScreen() {
     editorScroll();
 
     struct abuf ab = ABUF_INIT;
-
+    abAppend(&ab, "\033[H\033[J", 6); // Clear the screen.
     abAppend(&ab, "\x1b[?25l", 6);
     abAppend(&ab, "\x1b[H", 3); // Position the cursor : (3 bytes)
 
