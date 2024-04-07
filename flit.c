@@ -24,6 +24,7 @@
 #define CTRL_KEY(k) ((k) & 0x1f) // Set upper 3 bits of char to 0. Sameas CTRL key
 
 enum editorKey {
+    BACKSPACE = 127,
     LEFT = 1000,
     RIGHT,
     UP,
@@ -452,11 +453,21 @@ void editorHandleKeyPress() {
     int c = editorReadKey();
 
     switch (c) {
+        case '\r':
+            /* TODO */
+            break;
+
         case CTRL_KEY('q'):
             write(STDOUT_FILENO, "\x1b[2J", 4);
             write(STDERR_FILENO, "\x1b[H", 3);
 
             exit(0);
+            break;
+
+        case BACKSPACE:
+        case CTRL_KEY('h'):
+        case DEL:
+            /* TODO */
             break;
 
         case P_UP:
@@ -480,6 +491,10 @@ void editorHandleKeyPress() {
         case LEFT:
         case RIGHT:
             editorMoveCursor(c);
+            break;
+
+        case CTRL_KEY('l'): // We already refresh
+        case '\x1b':        // Ignoring Escape Key
             break;
 
         default:
