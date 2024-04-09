@@ -1,3 +1,1 @@
-https://viewsourcecode.org/snaptoken/kilo/
-
-#TODO: "Dirty Flag" for buffers
+https://viewsourcecode.org/snaptoken/kilo/05.aTextEditor.html#simple-backspacing
