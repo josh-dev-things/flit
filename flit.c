@@ -6,6 +6,7 @@
 
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -18,7 +19,7 @@
 
 /*** defines ***/
 
-#define VERSION "0.0.1"
+#define VERSION "0.0.2"
 #define TAB_STOP 8
 
 #define CTRL_KEY(k) ((k) & 0x1f) // Set upper 3 bits of char to 0. Sameas CTRL key
@@ -60,6 +61,10 @@ struct editorConfig {
 };
 
 struct editorConfig E;
+
+/*** prototypes ***/
+
+void editorSetStatusMessage(const char* fmt, ...);
 
 /*** terminal ***/
 
@@ -175,6 +180,8 @@ int getWindowSize(int *rows, int *cols) {
 
 /*** row operations ***/
 
+/// @brief Convert cx to rx
+/// @param row row to convert
 int editorRowCxToRx(erow *row, int cx) {
     int rx = 0;
     int j;
@@ -249,6 +256,29 @@ void editorInsertChar(int c) {
 
 /*** file IO ***/
 
+/// @brief calculate length of buffer & return buffer containing all rows
+/// @param buflen pointer to store buffer length into
+/// @return all rows in a single buffer
+char* editorRowsToString(int* buflen) {
+    int totlen = 0;
+    int j;
+    for(j = 0; j < E.numrows; j++) {
+        totlen += E.row[j].size + 1;
+    }
+    *buflen = totlen;
+
+    char* buf = malloc(totlen);
+    char* p = buf;
+    for(j = 0; j < E.numrows; j++) {
+        memcpy(p, E.row[j].chars, E.row[j].size);
+        p += E.row[j].size;
+        *p = '\n';
+        p++;
+    }
+
+    return buf;
+}
+
 void editorOpen(char* filename) {
     free(E.filename);
     E.filename = strdup(filename);
@@ -267,6 +297,29 @@ void editorOpen(char* filename) {
     }
     free(line);
     fclose(fp);
+}
+
+void editorSave() {
+    if (E.filename == NULL) return; // Prompt user for a filename?
+
+    int len;
+    char* buf = editorRowsToString(&len);
+    
+    int fd = open(E.filename, O_RDWR | O_CREAT, 0644);
+    if(fd != -1) {
+        if(ftruncate(fd, len) != -1) {
+            if(write(fd, buf, len) == len) {
+                close(fd);
+                free(buf);
+                editorSetStatusMessage("%d bytes written to disk.", len);
+                return;
+            }
+        }
+        close(fd);
+    }
+
+    free(buf);
+    editorSetStatusMessage("Write failed. IO error: %s", strerror(errno));
 }
 
 /*** append buffer ***/
@@ -464,6 +517,10 @@ void editorHandleKeyPress() {
             exit(0);
             break;
 
+        case CTRL_KEY('s'):
+            editorSave();
+            break;
+
         case BACKSPACE:
         case CTRL_KEY('h'):
         case DEL:
@@ -530,7 +587,7 @@ int main(int argc, char *argv[]) {
         editorOpen(argv[1]);
     }
 
-    editorSetStatusMessage("HELP: Ctrl-Q = quit");
+    editorSetStatusMessage("HELP: Ctrl-S = save | Ctrl-Q = quit");
 
     while(1) {
         editorRefreshScreen();
