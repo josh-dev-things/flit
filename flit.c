@@ -246,6 +246,15 @@ void editorRowInsertChar(erow* row, int at, int c) {
     editorUpdateRow(row);
 }
 
+void editorRowDeleteChar(erow* row, int at) {
+    if (at < 0 || at > row->size) return;
+
+    memmove(&row->chars[at], &row->chars[at+1], row->size - at);
+    row->size--;
+    editorUpdateRow(row);
+    E.dirty++;
+}
+
 /*** editor operations ***/
 
 void editorInsertChar(int c) {
@@ -254,6 +263,16 @@ void editorInsertChar(int c) {
     }
     editorRowInsertChar(&E.row[E.cy], E.cx, c);
     E.cx++;
+}
+
+void editorDeleteChar() {
+    if(E.cy == E.numrows) return;
+
+    erow* row = &E.row[E.cy];
+    if(E.cx > 0) {
+        editorRowDeleteChar(row, E.cx-1);
+        E.cx--;
+    }
 }
 
 /*** file IO ***/
@@ -529,7 +548,8 @@ void editorHandleKeyPress() {
         case BACKSPACE:
         case CTRL_KEY('h'):
         case DEL:
-            /* TODO */
+            if(c == DEL) editorMoveCursor(RIGHT);
+            editorDeleteChar();
             break;
 
         case P_UP:
