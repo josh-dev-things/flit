@@ -355,8 +355,7 @@ void editorUpdateSyntax(erow* row) {
     int changed = (row->hl_open_comment != in_comment);
     row->hl_open_comment = in_comment;
     if (changed && row->idx + 1 < E.numrows)
-        editorUpdateSyntax(&E.row[row->idx + 1]);
-    
+        editorUpdateSyntax(&E.row[row->idx + 1]); 
 }
 
 /* 31 = */
@@ -762,9 +761,10 @@ void editorDrawRows(struct abuf *ab) {
     int y;
     for (y = 0; y < E.screenrows; y++) {
         int filerow = y + E.rowoff;
+
         if(filerow >= E.numrows) {
             if (E.numrows == 0 && y == E.screenrows / 3) {
-                char welcome[80];
+                char welcome[80]; // Welcome message buffer
                 int welcomelen = snprintf(welcome, sizeof(welcome), "Flit editor -- version %s", VERSION);
                 if (welcomelen > E.screencols) welcomelen = E.screencols;
 
@@ -778,9 +778,9 @@ void editorDrawRows(struct abuf *ab) {
 
                 abAppend(ab, welcome, welcomelen);
             } else {
-                abAppend(ab, "~", 1);
+                abAppend(ab, "~", 1); // Prefix for unused line
             }
-        } else {
+        } else { // The line is in the used section of the editor.
             int len = E.row[filerow].rsize - E.coloff;
             if (len < 0) len = 0;
             if (len > E.screencols) len = E.screencols;
@@ -789,18 +789,24 @@ void editorDrawRows(struct abuf *ab) {
             unsigned char* hl = &E.row[filerow].hl[E.coloff];
             int current_color = -1;
 
+            // margin line numbers
+            char margin[7];
+            margin[6] = '\0'; // Null terminate
+            sprintf(margin, "%4d| ", filerow); // padding
+            abAppend(ab, margin, 6);
+
             int j;
             for(j = 0; j < len; j++) {
-		if (iscntrl(c[j])) {
-			char sym = (c[j] <= 26) ? '@' + c[j] : '?';
-			abAppend(ab, "\x1b[7m", 4);
-			abAppend(ab, &sym, 1);
-			abAppend(ab, "\x1b[m", 3);
-			if (current_color != -1) {
-				char buf[16];
-				int clen = snprintf(buf, sizeof(buf), "\x1b[%dm", current_color);
-				abAppend(ab, buf, clen);
-			}
+                if (iscntrl(c[j])) {
+                    char sym = (c[j] <= 26) ? '@' + c[j] : '?';
+                    abAppend(ab, "\x1b[7m", 4);
+                    abAppend(ab, &sym, 1);
+                    abAppend(ab, "\x1b[m", 3);
+                    if (current_color != -1) {
+                        char buf[16];
+                        int clen = snprintf(buf, sizeof(buf), "\x1b[%dm", current_color);
+                        abAppend(ab, buf, clen);
+                    }
                 } else if (hl[j] == HL_NORMAL) {
                     if(current_color != -1) {
                         abAppend(ab, "\x1b[39m", 5);
