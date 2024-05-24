@@ -21,6 +21,7 @@
 
 #define VERSION "0.0.2"
 #define TAB_STOP 8
+#define MARGIN 6
 
 #define CTRL_KEY(k) ((k) & 0x1f) // Set upper 3 bits of char to 0. Sameas CTRL key
 
@@ -872,14 +873,14 @@ void editorRefreshScreen() {
     struct abuf ab = ABUF_INIT;
     abAppend(&ab, "\033[H\033[J", 6); // Clear the screen.
     abAppend(&ab, "\x1b[?25l", 6);
-    abAppend(&ab, "\x1b[H", 3); // Position the cursor : (3 bytes)
+    abAppend(&ab, "\x1b[H", 3); // Position the cursor to home: (3 bytes)
 
     editorDrawRows(&ab);
     editorDrawStatusBar(&ab);
     editorDrawMessageBar(&ab);
 
     char buf[32];
-    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, (E.rx - E.coloff) + 1);
+    snprintf(buf, sizeof(buf), "\x1b[%d;%dH", (E.cy - E.rowoff) + 1, (E.rx - E.coloff) + 1 + MARGIN); // Cursor position
     abAppend(&ab, buf, strlen(buf));
 
     abAppend(&ab, "\x1b[?25h", 6);
