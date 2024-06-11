@@ -86,6 +86,9 @@ struct editorConfig {
     char statusmsg[80];
     time_t statusmsg_time;
 
+    int selection_start_x, selection_start_y; // Selection start
+    int selection_end_x, selection_end_y; // Selection end
+
     struct editorSyntax *syntax;
     struct termios old_termios;
 };
