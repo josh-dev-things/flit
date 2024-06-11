@@ -87,7 +87,7 @@ struct editorConfig {
     time_t statusmsg_time;
 
     int selection_start_x, selection_start_y; // Selection start
-    int selection_end_x, selection_end_y; // Selection end
+    int selecting;
 
     struct editorSyntax *syntax;
     struct termios old_termios;
@@ -801,6 +801,14 @@ void editorDrawRows(struct abuf *ab) {
 
             int j;
             for(j = 0; j < len; j++) {
+                // Selection
+                if(E.selecting && 
+                (filerow > E.selection_start_y || (filerow == E.selection_start_y && j > E.selection_start_x)) &&
+                (filerow < E.cy || (filerow == E.cy && j < E.cx))) {
+                    // Inside selection bounds
+                    abAppend(ab, "\033[43m", 5);
+                } 
+
                 if (iscntrl(c[j])) {
                     char sym = (c[j] <= 26) ? '@' + c[j] : '?';
                     abAppend(ab, "\x1b[7m", 4);
@@ -828,7 +836,7 @@ void editorDrawRows(struct abuf *ab) {
                     abAppend(ab, &c[j], 1);
                 }
             }
-            abAppend(ab, "\x1b[39m", 5);
+            abAppend(ab, "\x1b[39m\033[0m", 9); // Reset Colour and Highlighting
         }
 
         abAppend(ab, "\x1b[K", 3); // Clearing screen by "Erasing in line"
@@ -1000,6 +1008,16 @@ void editorHandleKeyPress() {
             editorFind();
             break;
 
+        case CTRL_KEY('e'):
+            if(E.selecting) {
+                E.selecting = 0;
+            } else {
+                E.selecting = 1;
+                E.selection_start_x = E.cx;
+                E.selection_start_y = E.cy;
+            }
+            break;
+
         case BACKSPACE:
         case CTRL_KEY('h'):
         case DEL:
@@ -1057,6 +1075,10 @@ void initEditor() {
     E.statusmsg[0] = '\0';
     E.statusmsg_time = 0;
     E.syntax = NULL;
+
+    E.selection_start_x = 0;
+    E.selection_start_y = 0;
+    E.selecting = 0;
 
     if (getWindowSize(&E.screenrows, &E.screencols) == -1) fail("getWindowSize");
     E.screenrows-=2;
