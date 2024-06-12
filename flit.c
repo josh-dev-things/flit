@@ -566,6 +566,45 @@ void editorDeleteChar() {
     }
 }
 
+/// @brief copy the selection of characters to a buffer
+void editorCopy() {
+    if(E.selecting) {
+        int sel_start_y = E.selection_start_y, sel_end_y = E.cy;
+        int sel_start_x = E.selection_start_x, sel_end_x = E.cx;
+
+        // Swap start and end if necessary (Code duplicated in highlighting)
+        if(sel_start_y > sel_end_y || (sel_start_y == sel_end_y && sel_start_x > sel_end_x)) {
+            sel_start_x = E.cx; sel_start_y = E.cy;
+            sel_end_x = E.selection_start_x; sel_end_y = E.selection_start_y;
+        }
+
+        int buffer_len = 0;
+        if (sel_end_y == sel_start_y) {
+            // Same line
+            buffer_len = sel_end_x - sel_start_x;
+        } else {
+            // First line
+            buffer_len += E.row[sel_start_y].size - sel_start_x;
+
+            // Complete lines in range
+            for (int i = sel_start_y + 1; i < sel_end_y; i++) {
+                buffer_len += E.row[i].size;
+            }
+
+            // Last line
+            buffer_len += sel_end_x;
+        }
+
+        // Now iterate through all the characters to copy & append them to buffer
+
+        editorSetStatusMessage("Copied %d characters", buffer_len);
+
+    } else {
+        // Display message.
+        editorSetStatusMessage("Copy failed: No selection (Ctrl-E & Arrow Keys)");
+    }
+}
+
 /*** file IO ***/
 
 /// @brief calculate length of buffer & return buffer containing all rows
@@ -808,9 +847,8 @@ void editorDrawRows(struct abuf *ab) {
 
                     // Swap start and end if necessary
                     if(sel_start_y > sel_end_y || (sel_start_y == sel_end_y && sel_start_x > sel_end_x)) {
-                        int temp_x = sel_start_x, temp_y = sel_start_y;
-                        sel_start_x = sel_end_x; sel_start_y = sel_end_y;
-                        sel_end_x = temp_x; sel_end_y = temp_y;
+                        sel_start_x = E.cx; sel_start_y = E.cy;
+                        sel_end_x = E.selection_start_x; sel_end_y = E.selection_start_y;
                     }
 
                     // Check if current character is within selection bounds
@@ -848,7 +886,7 @@ void editorDrawRows(struct abuf *ab) {
                     }
                     abAppend(ab, &c[j], 1);
                 }
-            } // TODO WTF ARE THESE CHARACTER INSERTION POINTS
+            }
             abAppend(ab, "\033[0m", 4); // Reset Highlighting
             abAppend(ab, "\x1b[39m", 5); // Reset Colour
         }
@@ -1026,10 +1064,15 @@ void editorHandleKeyPress() {
             if(E.selecting) {
                 E.selecting = 0;
             } else {
+                editorSetStatusMessage("Selection: Use Arrows | Ctrl-E");
                 E.selecting = 1;
                 E.selection_start_x = E.cx;
                 E.selection_start_y = E.cy;
             }
+            break;
+
+        case CTRL_KEY('c'):
+            editorCopy();
             break;
 
         case BACKSPACE:
