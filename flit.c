@@ -802,12 +802,25 @@ void editorDrawRows(struct abuf *ab) {
             int j;
             for(j = 0; j < len; j++) {
                 // Selection
-                if(E.selecting && 
-                (filerow > E.selection_start_y || (filerow == E.selection_start_y && j > E.selection_start_x)) &&
-                (filerow < E.cy || (filerow == E.cy && j < E.cx))) {
-                    // Inside selection bounds
-                    abAppend(ab, "\033[43m", 5);
-                } 
+                if(E.selecting) {
+                    int sel_start_x = E.selection_start_x, sel_start_y = E.selection_start_y;
+                    int sel_end_x = E.cx, sel_end_y = E.cy;
+
+                    // Swap start and end if necessary
+                    if(sel_start_y > sel_end_y || (sel_start_y == sel_end_y && sel_start_x > sel_end_x)) {
+                        int temp_x = sel_start_x, temp_y = sel_start_y;
+                        sel_start_x = sel_end_x; sel_start_y = sel_end_y;
+                        sel_end_x = temp_x; sel_end_y = temp_y;
+                    }
+
+                    // Check if current character is within selection bounds
+                    if((filerow > sel_start_y || (filerow == sel_start_y && j >= sel_start_x)) &&
+                    (filerow < sel_end_y || (filerow == sel_end_y && j <= sel_end_x))) {
+                        abAppend(ab, "\033[43m", 5);
+                    } else if (filerow == sel_end_y && j == sel_end_x + 1) {
+                        abAppend(ab, "\033[0m", 4); // Final character in selection resets highlighting
+                    }
+                }
 
                 if (iscntrl(c[j])) {
                     char sym = (c[j] <= 26) ? '@' + c[j] : '?';
@@ -835,8 +848,9 @@ void editorDrawRows(struct abuf *ab) {
                     }
                     abAppend(ab, &c[j], 1);
                 }
-            }
-            abAppend(ab, "\x1b[39m\033[0m", 9); // Reset Colour and Highlighting
+            } // TODO WTF ARE THESE CHARACTER INSERTION POINTS
+            abAppend(ab, "\033[0m", 4); // Reset Highlighting
+            abAppend(ab, "\x1b[39m", 5); // Reset Colour
         }
 
         abAppend(ab, "\x1b[K", 3); // Clearing screen by "Erasing in line"
