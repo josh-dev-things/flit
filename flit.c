@@ -88,6 +88,8 @@ struct editorConfig {
 
     int selection_start_x, selection_start_y; // Selection start
     int selecting;
+    char* copy_buffer;
+    int copy_buffer_len;
 
     struct editorSyntax *syntax;
     struct termios old_termios;
@@ -507,6 +509,19 @@ void editorRowInsertChar(erow* row, int at, int c) {
     E.dirty++;
 }
 
+void editorRowInsertString(erow* row, int at, int len, char* cs) {
+    if (at < 0 || at > row->size) {
+        at = row->size;
+    }
+
+    row->chars = realloc(row->chars, row->size + len + 1);
+    memmove(&row->chars[at+len], &row->chars[at], row->size - at + 1);
+    memcpy(&row->chars[at], cs, len);
+    row->size += len;
+    editorUpdateRow(row);
+    E.dirty++;
+}
+
 void editorRowAppendString(erow* row, char* s, size_t len) {
     row->chars = realloc(row->chars, row->size + len + 1);
     memcpy(&row->chars[row->size], s, len);
@@ -566,6 +581,17 @@ void editorDeleteChar() {
     }
 }
 
+void editorStartSelecting() {
+    editorSetStatusMessage("Selection: Use Arrows | Ctrl-E");
+    E.selecting = 1;
+    E.selection_start_x = E.cx;
+    E.selection_start_y = E.cy;
+}
+
+void editorStopSelecting() {
+    E.selecting = 0;
+}
+
 /// @brief copy the selection of characters to a buffer
 void editorCopy() {
     if(E.selecting) {
@@ -596,12 +622,49 @@ void editorCopy() {
         }
 
         // Now iterate through all the characters to copy & append them to buffer
+        char* buffer = malloc(buffer_len + 1); // Null terminated string
+        int index = 0;
 
-        editorSetStatusMessage("Copied %d characters", buffer_len);
+        if (sel_end_y == sel_start_y) {
+            strncpy(buffer, &E.row[sel_end_y].chars[sel_start_x], buffer_len);
+            buffer[buffer_len] = '\0';
+        } else {
+            strncpy(buffer, &E.row[sel_start_y].chars[sel_start_x], E.row[sel_start_y].size - sel_start_x);
+            index += E.row[sel_start_y].size - sel_start_x; // No. Characters from first line
+
+            for (int i = sel_start_y + 1; i < sel_end_y; i++) {
+                strncpy(&buffer[index], E.row[i].chars, E.row[i].size);
+                index += E.row[i].size;
+            }
+
+            strncpy(&buffer[index], E.row[sel_end_y].chars, sel_end_x); // Last characters on last line
+            buffer[index + sel_end_x] = '\0'; // EOS
+        }
+
+        if(E.copy_buffer) free(E.copy_buffer);
+        E.copy_buffer = buffer;
+        E.copy_buffer_len = buffer_len;
+        editorSetStatusMessage("Copied %d characters: %s", buffer_len, E.copy_buffer);
 
     } else {
         // Display message.
         editorSetStatusMessage("Copy failed: No selection (Ctrl-E & Arrow Keys)");
+    }
+
+    editorStopSelecting(); // Once copied, no need to be selecting anymore
+}
+
+/// UNSAFE
+void editorPaste() {
+    if (E.copy_buffer) {
+        if(E.cy == E.numrows) {
+            editorInsertRow(E.numrows, "", 0);
+        }
+
+        editorRowInsertString(&E.row[E.cy], E.cx, E.copy_buffer_len, E.copy_buffer);
+        editorSetStatusMessage("Pasted %d characters @ %d,%d", E.copy_buffer_len, E.cx, E.cy);
+    } else {
+        editorSetStatusMessage("Paste failed: Copy buffer empty");
     }
 }
 
@@ -853,9 +916,9 @@ void editorDrawRows(struct abuf *ab) {
 
                     // Check if current character is within selection bounds
                     if((filerow > sel_start_y || (filerow == sel_start_y && j >= sel_start_x)) &&
-                    (filerow < sel_end_y || (filerow == sel_end_y && j <= sel_end_x))) {
+                    (filerow < sel_end_y || (filerow == sel_end_y && j < sel_end_x))) {
                         abAppend(ab, "\033[43m", 5);
-                    } else if (filerow == sel_end_y && j == sel_end_x + 1) {
+                    } else if (filerow == sel_end_y && j == sel_end_x) {
                         abAppend(ab, "\033[0m", 4); // Final character in selection resets highlighting
                     }
                 }
@@ -1062,17 +1125,18 @@ void editorHandleKeyPress() {
 
         case CTRL_KEY('e'):
             if(E.selecting) {
-                E.selecting = 0;
+                editorStopSelecting();
             } else {
-                editorSetStatusMessage("Selection: Use Arrows | Ctrl-E");
-                E.selecting = 1;
-                E.selection_start_x = E.cx;
-                E.selection_start_y = E.cy;
+                editorStartSelecting();
             }
             break;
 
         case CTRL_KEY('c'):
             editorCopy();
+            break;
+
+        case CTRL_KEY('v'):
+            editorPaste();
             break;
 
         case BACKSPACE:
@@ -1136,6 +1200,8 @@ void initEditor() {
     E.selection_start_x = 0;
     E.selection_start_y = 0;
     E.selecting = 0;
+    E.copy_buffer = NULL;
+    E.copy_buffer_len = 0;
 
     if (getWindowSize(&E.screenrows, &E.screencols) == -1) fail("getWindowSize");
     E.screenrows-=2;
