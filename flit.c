@@ -614,10 +614,12 @@ void editorCopy() {
 
             // Complete lines in range
             for (int i = sel_start_y + 1; i < sel_end_y; i++) {
+                buffer_len++; // Newline
                 buffer_len += E.row[i].size;
             }
 
             // Last line
+            buffer_len++; // Newline
             buffer_len += sel_end_x;
         }
 
@@ -633,10 +635,14 @@ void editorCopy() {
             index += E.row[sel_start_y].size - sel_start_x; // No. Characters from first line
 
             for (int i = sel_start_y + 1; i < sel_end_y; i++) {
+                buffer[index] = '\n';
+                index++;
                 strncpy(&buffer[index], E.row[i].chars, E.row[i].size);
                 index += E.row[i].size;
             }
 
+            buffer[index] = '\n';
+            index++;
             strncpy(&buffer[index], E.row[sel_end_y].chars, sel_end_x); // Last characters on last line
             buffer[index + sel_end_x] = '\0'; // EOS
         }
@@ -644,7 +650,7 @@ void editorCopy() {
         if(E.copy_buffer) free(E.copy_buffer);
         E.copy_buffer = buffer;
         E.copy_buffer_len = buffer_len;
-        editorSetStatusMessage("Copied %d characters: %s", buffer_len, E.copy_buffer);
+        editorSetStatusMessage("Copied %d characters", buffer_len);
 
     } else {
         // Display message.
@@ -661,7 +667,14 @@ void editorPaste() {
             editorInsertRow(E.numrows, "", 0);
         }
 
-        editorRowInsertString(&E.row[E.cy], E.cx, E.copy_buffer_len, E.copy_buffer);
+        for (int i = 0; i < E.copy_buffer_len; i++) {
+            if(E.copy_buffer[i] == '\n') {
+                editorInsertNewline();
+            } else {
+                editorInsertChar(E.copy_buffer[i]);
+            }
+        }
+
         editorSetStatusMessage("Pasted %d characters @ %d,%d", E.copy_buffer_len, E.cx, E.cy);
     } else {
         editorSetStatusMessage("Paste failed: Copy buffer empty");
