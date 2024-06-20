@@ -86,6 +86,11 @@ struct editorConfig {
     char statusmsg[80];
     time_t statusmsg_time;
 
+    int selection_start_x, selection_start_y; // Selection start
+    int selecting;
+    char* copy_buffer;
+    int copy_buffer_len;
+
     struct editorSyntax *syntax;
     struct termios old_termios;
 };
@@ -504,6 +509,19 @@ void editorRowInsertChar(erow* row, int at, int c) {
     E.dirty++;
 }
 
+void editorRowInsertString(erow* row, int at, int len, char* cs) {
+    if (at < 0 || at > row->size) {
+        at = row->size;
+    }
+
+    row->chars = realloc(row->chars, row->size + len + 1);
+    memmove(&row->chars[at+len], &row->chars[at], row->size - at + 1);
+    memcpy(&row->chars[at], cs, len);
+    row->size += len;
+    editorUpdateRow(row);
+    E.dirty++;
+}
+
 void editorRowAppendString(erow* row, char* s, size_t len) {
     row->chars = realloc(row->chars, row->size + len + 1);
     memcpy(&row->chars[row->size], s, len);
@@ -560,6 +578,106 @@ void editorDeleteChar() {
         editorRowAppendString(&E.row[E.cy-1], row->chars, row->size);
         editorDelRow(E.cy);
         E.cy--;
+    }
+}
+
+void editorStartSelecting() {
+    editorSetStatusMessage("Selection: Use Arrows | Ctrl-E");
+    E.selecting = 1;
+    E.selection_start_x = E.cx;
+    E.selection_start_y = E.cy;
+}
+
+void editorStopSelecting() {
+    E.selecting = 0;
+}
+
+/// @brief copy the selection of characters to a buffer
+void editorCopy() {
+    if(E.selecting) {
+        int sel_start_y = E.selection_start_y, sel_end_y = E.cy;
+        int sel_start_x = E.selection_start_x, sel_end_x = E.cx;
+
+        // Swap start and end if necessary (Code duplicated in highlighting)
+        if(sel_start_y > sel_end_y || (sel_start_y == sel_end_y && sel_start_x > sel_end_x)) {
+            sel_start_x = E.cx; sel_start_y = E.cy;
+            sel_end_x = E.selection_start_x; sel_end_y = E.selection_start_y;
+        }
+
+        int buffer_len = 0;
+        if (sel_end_y == sel_start_y) {
+            // Same line
+            buffer_len = sel_end_x - sel_start_x;
+        } else {
+            // First line
+            buffer_len += E.row[sel_start_y].size - sel_start_x;
+
+            // Complete lines in range
+            for (int i = sel_start_y + 1; i < sel_end_y; i++) {
+                buffer_len++; // Newline
+                buffer_len += E.row[i].size;
+            }
+
+            // Last line
+            buffer_len++; // Newline
+            buffer_len += sel_end_x;
+        }
+
+        // Now iterate through all the characters to copy & append them to buffer
+        char* buffer = malloc(buffer_len + 1); // Null terminated string
+        int index = 0;
+
+        if (sel_end_y == sel_start_y) {
+            strncpy(buffer, &E.row[sel_end_y].chars[sel_start_x], buffer_len);
+            buffer[buffer_len] = '\0';
+        } else {
+            strncpy(buffer, &E.row[sel_start_y].chars[sel_start_x], E.row[sel_start_y].size - sel_start_x);
+            index += E.row[sel_start_y].size - sel_start_x; // No. Characters from first line
+
+            for (int i = sel_start_y + 1; i < sel_end_y; i++) {
+                buffer[index] = '\n';
+                index++;
+                strncpy(&buffer[index], E.row[i].chars, E.row[i].size);
+                index += E.row[i].size;
+            }
+
+            buffer[index] = '\n';
+            index++;
+            strncpy(&buffer[index], E.row[sel_end_y].chars, sel_end_x); // Last characters on last line
+            buffer[index + sel_end_x] = '\0'; // EOS
+        }
+
+        if(E.copy_buffer) free(E.copy_buffer);
+        E.copy_buffer = buffer;
+        E.copy_buffer_len = buffer_len;
+        editorSetStatusMessage("Copied %d characters", buffer_len);
+
+    } else {
+        // Display message.
+        editorSetStatusMessage("Copy failed: No selection (Ctrl-E & Arrow Keys)");
+    }
+
+    editorStopSelecting(); // Once copied, no need to be selecting anymore
+}
+
+/// UNSAFE
+void editorPaste() {
+    if (E.copy_buffer) {
+        if(E.cy == E.numrows) {
+            editorInsertRow(E.numrows, "", 0);
+        }
+
+        for (int i = 0; i < E.copy_buffer_len; i++) {
+            if(E.copy_buffer[i] == '\n') {
+                editorInsertNewline();
+            } else {
+                editorInsertChar(E.copy_buffer[i]);
+            }
+        }
+
+        editorSetStatusMessage("Pasted %d characters @ %d,%d", E.copy_buffer_len, E.cx, E.cy);
+    } else {
+        editorSetStatusMessage("Paste failed: Copy buffer empty");
     }
 }
 
@@ -798,6 +916,26 @@ void editorDrawRows(struct abuf *ab) {
 
             int j;
             for(j = 0; j < len; j++) {
+                // Selection
+                if(E.selecting) {
+                    int sel_start_x = E.selection_start_x, sel_start_y = E.selection_start_y;
+                    int sel_end_x = E.cx, sel_end_y = E.cy;
+
+                    // Swap start and end if necessary
+                    if(sel_start_y > sel_end_y || (sel_start_y == sel_end_y && sel_start_x > sel_end_x)) {
+                        sel_start_x = E.cx; sel_start_y = E.cy;
+                        sel_end_x = E.selection_start_x; sel_end_y = E.selection_start_y;
+                    }
+
+                    // Check if current character is within selection bounds
+                    if((filerow > sel_start_y || (filerow == sel_start_y && j >= sel_start_x)) &&
+                    (filerow < sel_end_y || (filerow == sel_end_y && j < sel_end_x))) {
+                        abAppend(ab, "\033[43m", 5);
+                    } else if (filerow == sel_end_y && j == sel_end_x) {
+                        abAppend(ab, "\033[0m", 4); // Final character in selection resets highlighting
+                    }
+                }
+
                 if (iscntrl(c[j])) {
                     char sym = (c[j] <= 26) ? '@' + c[j] : '?';
                     abAppend(ab, "\x1b[7m", 4);
@@ -825,7 +963,8 @@ void editorDrawRows(struct abuf *ab) {
                     abAppend(ab, &c[j], 1);
                 }
             }
-            abAppend(ab, "\x1b[39m", 5);
+            abAppend(ab, "\033[0m", 4); // Reset Highlighting
+            abAppend(ab, "\x1b[39m", 5); // Reset Colour
         }
 
         abAppend(ab, "\x1b[K", 3); // Clearing screen by "Erasing in line"
@@ -997,6 +1136,22 @@ void editorHandleKeyPress() {
             editorFind();
             break;
 
+        case CTRL_KEY('e'):
+            if(E.selecting) {
+                editorStopSelecting();
+            } else {
+                editorStartSelecting();
+            }
+            break;
+
+        case CTRL_KEY('c'):
+            editorCopy();
+            break;
+
+        case CTRL_KEY('v'):
+            editorPaste();
+            break;
+
         case BACKSPACE:
         case CTRL_KEY('h'):
         case DEL:
@@ -1054,6 +1209,12 @@ void initEditor() {
     E.statusmsg[0] = '\0';
     E.statusmsg_time = 0;
     E.syntax = NULL;
+
+    E.selection_start_x = 0;
+    E.selection_start_y = 0;
+    E.selecting = 0;
+    E.copy_buffer = NULL;
+    E.copy_buffer_len = 0;
 
     if (getWindowSize(&E.screenrows, &E.screencols) == -1) fail("getWindowSize");
     E.screenrows-=2;
