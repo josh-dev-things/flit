@@ -1,6 +1,5 @@
 # Flit
-
-A lightweight & versatile text editor.
+A lightweight & versatile text editor. Extended version of the text editor [kilo](http://antirez.com/news/108).
 
 # Attributions
 Built upon [antirez's kilo](http://antirez.com/news/108), following a step-by-step guide by [snaptoken](https://viewsourcecode.org/snaptoken/kilo/).
@@ -10,3 +9,7 @@ The decision to complete a step-by-step guide rather than just fork the kilo rep
 -   Line numbers
 -   Selection
 -   Copy & Paste
+
+# Contribution
+
+# License
