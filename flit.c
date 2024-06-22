@@ -59,7 +59,7 @@ struct editorSyntax {
     char* singleline_comment_start;
     char* multiline_comment_start;
     char* multiline_comment_end;
-    int flags;          // What to highlight | Flags => Regex?
+    int flags;          // What to highlight
 };
 
 typedef struct erow {
@@ -108,6 +108,11 @@ char* C_HL_keywords[] = {
     "void|", NULL
 };
 
+char* MD_HL_extensions[] = {".md", NULL};
+char* MD_HL_keywords[] = {
+    "#|", NULL
+};
+
 struct editorSyntax HLDB[] = {
     {
         "c",
@@ -115,7 +120,13 @@ struct editorSyntax HLDB[] = {
         C_HL_keywords,
         "//", "/*", "*/",
         HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STRINGS
-    },
+    }, {
+        "md",
+        MD_HL_extensions,
+        MD_HL_keywords,
+        NULL, "<!--", "-->",
+        NULL
+    }
 };
 
 #define HLDB_ENTRIES (sizeof(HLDB) / sizeof(HLDB[0])) // Length of HLDB array

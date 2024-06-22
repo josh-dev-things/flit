@@ -1,4 +1,5 @@
 # Flit
+
 A lightweight & versatile text editor.
 
 # Attributions
@@ -6,6 +7,6 @@ Built upon [antirez's kilo](http://antirez.com/news/108), following a step-by-st
 
 # Diff
 The decision to complete a step-by-step guide rather than just fork the kilo repository was made so I could learn about the development process of a low-level text editor. "Flit" differs to kilo (as at the end of the guide) through added features such as:
-    +   Line numbers
-    +   Selection
-    +   Copy & Paste
+-   Line numbers
+-   Selection
+-   Copy & Paste
