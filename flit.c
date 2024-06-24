@@ -86,7 +86,9 @@ struct editorConfig {
     char statusmsg[80];
     time_t statusmsg_time;
 
+    int dropped_cursor_x, dropped_cursor_y; // Inneficiency I know
     int selection_start_x, selection_start_y; // Selection start
+    int selection_end_x, selection_end_y;     // Selection end
     int selecting;
     char* copy_buffer;
     int copy_buffer_len;
@@ -595,57 +597,74 @@ void editorDeleteChar() {
 void editorStartSelecting() {
     editorSetStatusMessage("Selection: Use Arrows | Ctrl-E");
     E.selecting = 1;
-    E.selection_start_x = E.cx;
-    E.selection_start_y = E.cy;
+    editorDropCursor();
 }
 
 void editorStopSelecting() {
     E.selecting = 0;
+    E.selection_end_x = 0;
+    E.selection_end_y = 0;
+    E.selection_start_x = 0;
+    E.selection_start_y = 0;
 }
 
-/// @brief copy the selection of characters to a buffer
-void editorCopy() {
+int editorCollectSelection() {
     if(E.selecting) {
-        int sel_start_y = E.selection_start_y, sel_end_y = E.cy;
-        int sel_start_x = E.selection_start_x, sel_end_x = E.cx;
+        int sel_start_y = E.dropped_cursor_y, sel_end_y = E.cy;
+        int sel_start_x = E.dropped_cursor_x, sel_end_x = E.cx;
 
-        // Swap start and end if necessary (Code duplicated in highlighting)
         if(sel_start_y > sel_end_y || (sel_start_y == sel_end_y && sel_start_x > sel_end_x)) {
-            sel_start_x = E.cx; sel_start_y = E.cy;
-            sel_end_x = E.selection_start_x; sel_end_y = E.selection_start_y;
+            sel_start_x = sel_end_x; sel_start_y = sel_end_y;
+            sel_end_x = E.dropped_cursor_x; sel_end_y = E.dropped_cursor_y;
         }
 
-        int buffer_len = 0;
+        int count = 0;
         if (sel_end_y == sel_start_y) {
             // Same line
-            buffer_len = sel_end_x - sel_start_x;
+            count = sel_end_x - sel_start_x;
         } else {
             // First line
-            buffer_len += E.row[sel_start_y].size - sel_start_x;
+            count += E.row[sel_start_y].size - sel_start_x;
 
             // Complete lines in range
             for (int i = sel_start_y + 1; i < sel_end_y; i++) {
-                buffer_len++; // Newline
-                buffer_len += E.row[i].size;
+                count++; // Newline
+                count += E.row[i].size;
             }
 
             // Last line
-            buffer_len++; // Newline
-            buffer_len += sel_end_x;
+            count++; // Newline
+            count += sel_end_x;
         }
+
+        E.selection_start_x = sel_start_x;
+        E.selection_start_y = sel_start_y;
+        E.selection_end_y = sel_end_y;
+        E.selection_end_x = sel_end_x;
+
+        return count;
+    } else {
+        return 0;
+    }
+}
+
+/// @brief copy the selection of characters to a buffer
+void editorSelectionCopy() {
+    if(E.selecting) {
+        int buffer_len = editorCollectSelection();
 
         // Now iterate through all the characters to copy & append them to buffer
         char* buffer = malloc(buffer_len + 1); // Null terminated string
         int index = 0;
 
-        if (sel_end_y == sel_start_y) {
-            strncpy(buffer, &E.row[sel_end_y].chars[sel_start_x], buffer_len);
+        if (E.selection_end_y == E.selection_start_y) {
+            strncpy(buffer, &E.row[E.selection_end_y].chars[E.selection_start_x], buffer_len);
             buffer[buffer_len] = '\0';
         } else {
-            strncpy(buffer, &E.row[sel_start_y].chars[sel_start_x], E.row[sel_start_y].size - sel_start_x);
-            index += E.row[sel_start_y].size - sel_start_x; // No. Characters from first line
+            strncpy(buffer, &E.row[E.selection_start_y].chars[E.selection_start_x], E.row[E.selection_start_y].size - E.selection_start_x);
+            index += E.row[E.selection_start_y].size - E.selection_start_x; // No. Characters from first line
 
-            for (int i = sel_start_y + 1; i < sel_end_y; i++) {
+            for (int i = E.selection_start_y + 1; i < E.selection_end_y; i++) {
                 buffer[index] = '\n';
                 index++;
                 strncpy(&buffer[index], E.row[i].chars, E.row[i].size);
@@ -654,8 +673,8 @@ void editorCopy() {
 
             buffer[index] = '\n';
             index++;
-            strncpy(&buffer[index], E.row[sel_end_y].chars, sel_end_x); // Last characters on last line
-            buffer[index + sel_end_x] = '\0'; // EOS
+            strncpy(&buffer[index], E.row[E.selection_end_y].chars, E.selection_end_x); // Last characters on last line
+            buffer[index + E.selection_end_x] = '\0'; // EOS
         }
 
         if(E.copy_buffer) free(E.copy_buffer);
@@ -671,7 +690,7 @@ void editorCopy() {
     editorStopSelecting(); // Once copied, no need to be selecting anymore
 }
 
-/// UNSAFE
+/// @brief Paste characters from editor buffer
 void editorPaste() {
     if (E.copy_buffer) {
         if(E.cy == E.numrows) {
@@ -690,6 +709,25 @@ void editorPaste() {
     } else {
         editorSetStatusMessage("Paste failed: Copy buffer empty");
     }
+}
+
+void editorSelectionDelete() {
+    int numCharsToDelete = editorCollectSelection();
+    E.cx = E.selection_end_x;
+    E.cy = E.selection_end_y;
+
+    for(int i = 0; i < numCharsToDelete; i++) {
+        editorDeleteChar();
+    }
+    editorStopSelecting();
+}
+
+void editorSelectionIndent() {
+    //TODO
+}
+
+void editorSelectionUnindent() {
+    //TODO
 }
 
 /*** file IO ***/
@@ -929,21 +967,14 @@ void editorDrawRows(struct abuf *ab) {
             for(j = 0; j < len; j++) {
                 // Selection
                 if(E.selecting) {
-                    int sel_start_x = E.selection_start_x, sel_start_y = E.selection_start_y;
-                    int sel_end_x = E.cx, sel_end_y = E.cy;
-
-                    // Swap start and end if necessary
-                    if(sel_start_y > sel_end_y || (sel_start_y == sel_end_y && sel_start_x > sel_end_x)) {
-                        sel_start_x = E.cx; sel_start_y = E.cy;
-                        sel_end_x = E.selection_start_x; sel_end_y = E.selection_start_y;
-                    }
-
+                    // editorSetStatusMessage("Selection: %d/%d -> %d/%d", E.selection_start_x, E.selection_start_y, E.selection_end_x, E.selection_end_y);
+                    
                     // Check if current character is within selection bounds
-                    if((filerow > sel_start_y || (filerow == sel_start_y && j >= sel_start_x)) &&
-                    (filerow < sel_end_y || (filerow == sel_end_y && j < sel_end_x))) {
+                    if((filerow > E.selection_start_y || (filerow == E.selection_start_y && j >= E.selection_start_x)) &&
+                    (filerow < E.selection_end_y || (filerow == E.selection_end_y && j < E.selection_end_x))) {
                         abAppend(ab, "\033[43m", 5);
-                    } else if (filerow == sel_end_y && j == sel_end_x) {
-                        abAppend(ab, "\033[0m", 4); // Final character in selection resets highlighting
+                    } else if (filerow == E.selection_end_y && j == E.selection_end_x) {
+                        abAppend(ab, "\033[0m", 4); // Final character in selection resets highlighting. (Should come after the character)
                     }
                 }
 
@@ -1088,6 +1119,11 @@ char* editorPrompt(char* promt, void (*callback)(char*, int)){
     }
 }
 
+void editorDropCursor() {
+    E.dropped_cursor_x = E.cx;
+    E.dropped_cursor_y = E.cy;
+}
+
 void editorMoveCursor(int key) { 
     erow* row = (E.cy >= E.numrows) ? NULL : &E.row[E.cy];
 
@@ -1121,6 +1157,10 @@ void editorMoveCursor(int key) {
     if (E.cx > rowlen) {
         E.cx = rowlen;
     }
+
+    if (E.selecting) {
+        editorCollectSelection();
+    }
 }
 
 /// @brief Awaits keypress, then handles it.
@@ -1133,6 +1173,7 @@ void editorHandleKeyPress() {
             break;
 
         case CTRL_KEY('q'):
+            if (E.copy_buffer != NULL) {free(E.copy_buffer);}
             write(STDOUT_FILENO, "\x1b[2J", 4);
             write(STDERR_FILENO, "\x1b[H", 3);
 
@@ -1156,7 +1197,7 @@ void editorHandleKeyPress() {
             break;
 
         case CTRL_KEY('c'):
-            editorCopy();
+            editorSelectionCopy();
             break;
 
         case CTRL_KEY('v'):
@@ -1166,25 +1207,30 @@ void editorHandleKeyPress() {
         case BACKSPACE:
         case CTRL_KEY('h'):
         case DEL:
-            if(c == DEL) editorMoveCursor(RIGHT);
-            editorDeleteChar();
+            if(E.selecting) {
+                editorSelectionDelete();
+            } else {
+                if(c == DEL) editorMoveCursor(RIGHT);
+                editorDeleteChar();
+            }
             break;
 
         case P_UP:
         case P_DOWN:
-            {
-                if (c == P_UP) {
-                    E.cy = E.rowoff;
-                } else if (c == P_DOWN) {
-                    E.cy = E.rowoff + E.screenrows - 1;
-                    if (E.cy > E.numrows) E.cy = E.numrows;
-                }
-
-                int times = E.screenrows;
-                while (times--)
-                    editorMoveCursor(c == P_UP ? UP : DOWN);
-                break;
+            if (c == P_UP) {
+                E.cy = E.rowoff;
+            } else if (c == P_DOWN) {
+                E.cy = E.rowoff + E.screenrows - 1;
+                if (E.cy > E.numrows) E.cy = E.numrows;
             }
+
+            int times = E.screenrows;
+            while (times--)
+                editorMoveCursor(c == P_UP ? UP : DOWN);
+
+            if (E.selecting) {editorCollectSelection();}
+            break;
+            
 
         case UP:
         case DOWN:
@@ -1221,8 +1267,12 @@ void initEditor() {
     E.statusmsg_time = 0;
     E.syntax = NULL;
 
+    E.dropped_cursor_x = 0;
+    E.dropped_cursor_y = 0;
     E.selection_start_x = 0;
     E.selection_start_y = 0;
+    E.selection_end_x = 0;
+    E.selection_end_y = 0;
     E.selecting = 0;
     E.copy_buffer = NULL;
     E.copy_buffer_len = 0;
