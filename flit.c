@@ -711,6 +711,7 @@ void editorPaste() {
     }
 }
 
+/// @brief Delete a selection of multiple characters
 void editorSelectionDelete() {
     int numCharsToDelete = editorCollectSelection();
     E.cx = E.selection_end_x;
@@ -723,11 +724,30 @@ void editorSelectionDelete() {
 }
 
 void editorSelectionIndent() {
-    //TODO
+    //Tab on selection to mass-indent
+    editorCollectSelection();
+    editorRowInsertChar(&E.row[E.selection_start_y], E.selection_start_x, '\t');
+
+    for(int i = 1; i < E.selection_end_y - E.selection_start_y; i++)
+    {
+        editorRowInsertChar(&E.row[E.selection_start_y + i], E.selection_start_x, '\t');
+    }
 }
 
 void editorSelectionUnindent() {
-    //TODO
+    editorCollectSelection();
+
+    int first_indent = E.selection_start_x == 0 ? 0 : E.selection_start_x - 1;
+    if(E.row[E.selection_start_y].chars[first_indent] == '\t') {
+        editorRowDeleteChar(E.selection_start_y, first_indent);
+    }
+
+    for(int i = 1; i < E.selection_end_y - E.selection_start_y; i++)
+    {
+        if(E.row[E.selection_start_y + 1].chars[0] == '\t') {
+            editorRowDeleteChar(E.selection_start_y + 1, 0);
+        }
+    }
 }
 
 /*** file IO ***/
@@ -1201,6 +1221,10 @@ void editorHandleKeyPress() {
             break;
 
         case CTRL_KEY('v'):
+            if(E.selecting) {
+                editorSelectionDelete();
+            }
+
             editorPaste();
             break;
 
@@ -1243,7 +1267,25 @@ void editorHandleKeyPress() {
         case '\x1b':        // Ignoring Escape Key
             break;
 
+        // Fallthroughs to write char
+        case '\t':
+            if(E.selecting) {
+                if(c == CTRL_KEY('\t') && 0) { // Fix Unindent recog
+                    editorSelectionUnindent();                    
+                } else {
+                    editorSelectionIndent();
+                }
+            } else {
+                editorInsertChar(c);
+            }
+            break;
+
         default:
+            if(E.selecting) {
+                // Replace a selection with the new characters!
+                editorSelectionDelete();
+            }
+
             editorInsertChar(c);
             break;
         
