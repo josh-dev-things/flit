@@ -734,6 +734,7 @@ void editorSelectionIndent() {
     }
 }
 
+//TODO FIX SEGFAULT
 void editorSelectionUnindent() {
     editorCollectSelection();
 
@@ -1270,10 +1271,21 @@ void editorHandleKeyPress() {
         // Fallthroughs to write char
         case '\t':
             if(E.selecting) {
-                if(c == CTRL_KEY('\t') && 0) { // Fix Unindent recog
-                    editorSelectionUnindent();                    
-                } else {
-                    editorSelectionIndent();
+                char tab_dir = editorReadKey();
+                editorSetStatusMessage("Selection shift: i / u");
+                switch (tab_dir)
+                {
+                    case 'i':
+                        editorSelectionIndent();
+                        break;
+                    
+                    case 'u':
+                        editorSelectionUnindent(); // SEGFAULT
+                        break;
+
+                    default:
+                        editorSetStatusMessage("Invalid selection shift direction: %c", tab_dir); 
+                        break;
                 }
             } else {
                 editorInsertChar(c);
