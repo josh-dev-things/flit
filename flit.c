@@ -1271,8 +1271,8 @@ void editorHandleKeyPress() {
         // Fallthroughs to write char
         case '\t':
             if(E.selecting) {
-                char tab_dir = editorReadKey();
                 editorSetStatusMessage("Selection shift: i / u");
+                char tab_dir = editorReadKey();
                 switch (tab_dir)
                 {
                     case 'i':
