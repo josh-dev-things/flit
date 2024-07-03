@@ -728,25 +728,24 @@ void editorSelectionIndent() {
     editorCollectSelection();
     editorRowInsertChar(&E.row[E.selection_start_y], E.selection_start_x, '\t');
 
-    for(int i = 1; i < E.selection_end_y - E.selection_start_y; i++)
+    for(int i = 1; i <= E.selection_end_y - E.selection_start_y; i++)
     {
         editorRowInsertChar(&E.row[E.selection_start_y + i], E.selection_start_x, '\t');
     }
 }
 
-//TODO FIX SEGFAULT
 void editorSelectionUnindent() {
     editorCollectSelection();
 
     int first_indent = E.selection_start_x == 0 ? 0 : E.selection_start_x - 1;
     if(E.row[E.selection_start_y].chars[first_indent] == '\t') {
-        editorRowDeleteChar(E.selection_start_y, first_indent);
+        editorRowDeleteChar(&E.row[E.selection_start_y], first_indent);
     }
 
-    for(int i = 1; i < E.selection_end_y - E.selection_start_y; i++)
+    for(int i = 1; i <= E.selection_end_y - E.selection_start_y; i++)
     {
-        if(E.row[E.selection_start_y + 1].chars[0] == '\t') {
-            editorRowDeleteChar(E.selection_start_y + 1, 0);
+        if(E.row[E.selection_start_y + i].chars[0] == '\t') {
+            editorRowDeleteChar(&E.row[E.selection_start_y + i], 0);
         }
     }
 }
@@ -1271,7 +1270,6 @@ void editorHandleKeyPress() {
         // Fallthroughs to write char
         case '\t':
             if(E.selecting) {
-                editorSetStatusMessage("Selection shift: i / u");
                 char tab_dir = editorReadKey();
                 switch (tab_dir)
                 {
@@ -1280,7 +1278,7 @@ void editorHandleKeyPress() {
                         break;
                     
                     case 'u':
-                        editorSelectionUnindent(); // SEGFAULT
+                        editorSelectionUnindent();
                         break;
 
                     default:
