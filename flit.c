@@ -19,7 +19,7 @@
 
 /*** defines ***/
 
-#define VERSION "0.1.0"
+#define VERSION "0.2.0"
 #define TAB_STOP 8
 #define MARGIN 6
 
@@ -1270,13 +1270,18 @@ void editorHandleKeyPress() {
         // Fallthroughs to write char
         case '\t':
             if(E.selecting) {
+                editorSetStatusMessage("Selection shift: <- U | I ->");
+                editorRefreshScreen(); // Display message
+
                 char tab_dir = editorReadKey();
                 switch (tab_dir)
                 {
+                    case 'I':
                     case 'i':
                         editorSelectionIndent();
                         break;
                     
+                    case 'U':
                     case 'u':
                         editorSelectionUnindent();
                         break;
