@@ -10,6 +10,13 @@ The decision to complete a step-by-step guide rather than just fork the kilo rep
 -   Selection
 -   Copy & Paste
 
+# Release
+I have wanted to experiment with releasing my own Debian package for a while, and as I genuinely use Flit day-to-day I figured I'd make a package for the program and release it to learn about the publishing & maintenance workflows.
+
 # Contribution
+Feel free to fork the repository and use it how you wish. Please respect the original license and I highly encourage you to view the tutorial linked above. I have learnt a great deal from it.
+
+_If you'd like to contribute new features / improvements to flit, open a pull request and I'll likely merge it in._
 
 # License
+Read the license here: [LICENSE](./LICENSE)
