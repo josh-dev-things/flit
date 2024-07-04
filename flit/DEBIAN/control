@@ -1,0 +1,8 @@
+Package: flit
+Version: 0.2
+Section: base
+Priority: optional
+Architecture: amd64
+Depends: libc6 (>= 2.7)
+Maintainer: josh-dev-things
+Description: flit <flt> is a lightweight and versatile text editor.
