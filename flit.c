@@ -940,9 +940,11 @@ void editorScroll() {
     if (E.rx < E.coloff) {
         E.coloff = E.rx;
     }
-    if (E.rx >= E.coloff + E.screencols) {
-        E.coloff = E.rx - E.screencols + 1;
+    if (E.rx >= E.coloff + (E.screencols - MARGIN)) {
+        E.coloff = E.rx - (E.screencols - MARGIN) + 1;
     }
+    editorSetStatusMessage("%d", E.coloff);
+
 }
 
 void editorDrawRows(struct abuf *ab) {
@@ -971,7 +973,7 @@ void editorDrawRows(struct abuf *ab) {
         } else { // The line is in the used section of the editor.
             int len = E.row[filerow].rsize - E.coloff;
             if (len < 0) len = 0;
-            if (len > E.screencols + E.coloff + MARGIN) len = E.screencols - E.coloff - MARGIN;
+            if (len > (E.screencols - MARGIN)) len = (E.screencols - MARGIN);
             
             char* c = &E.row[filerow].render[E.coloff];
             unsigned char* hl = &E.row[filerow].hl[E.coloff];
