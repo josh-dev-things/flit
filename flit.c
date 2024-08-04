@@ -19,7 +19,7 @@
 
 /*** defines ***/
 
-#define VERSION "0.2.0"
+#define VERSION "0.2.2"
 #define TAB_STOP 8
 #define MARGIN 6
 
@@ -115,6 +115,16 @@ char* MD_HL_keywords[] = {
     "#|", NULL
 };
 
+char* PY_HL_extensions[] = {".py", NULL};
+char* PY_HL_keywords[] = {
+    "if", "else", "elif", "for", "while", "break", "continue", "try", "except",
+    "finally", "with", "as", "pass", "raise", "yield", "return", "TRUE", "FALSE",
+    "None", "and", "or", "not", "in", "is", "lambda",
+
+    "int|", "float|", "list|", "tuple|", "range|", "str|", "dict|", "set|", "bool|",
+    "len|", "type|", "print|", "input|", "open|", "enumerate|", NULL
+};
+
 struct editorSyntax HLDB[] = {
     {
         "c",
@@ -128,6 +138,12 @@ struct editorSyntax HLDB[] = {
         MD_HL_keywords,
         NULL, "<!--", "-->",
         NULL
+    }, {
+        "py",
+        PY_HL_extensions,
+        PY_HL_keywords,
+        "#", NULL, NULL,
+        HL_HIGHLIGHT_NUMBERS | HL_HIGHLIGHT_STRINGS
     }
 };
 
@@ -943,8 +959,6 @@ void editorScroll() {
     if (E.rx >= E.coloff + (E.screencols - MARGIN)) {
         E.coloff = E.rx - (E.screencols - MARGIN) + 1;
     }
-    editorSetStatusMessage("%d", E.coloff);
-
 }
 
 void editorDrawRows(struct abuf *ab) {
