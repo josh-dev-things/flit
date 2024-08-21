@@ -1,0 +1,6 @@
+Package: flit
+Version: 0.2.2
+Architecture: amd64
+Maintainer: Josh
+Description: A versatile and lightweight text editor.
+ Flit is a simple text editor compiled from a single C file. It has been designed to be small and fast, and is suitable for both programming and general text editing. Built upon Kilo (see README).
